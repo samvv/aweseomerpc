@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { websocket } from "hono/bun";
-import serve from "typedrpc/lib/serve/hono.js"
+import serve from "awesomerpc/lib/serve/hono.js"
 import { petStoreServerImpl } from "./server.js";
 
 const app = new Hono();

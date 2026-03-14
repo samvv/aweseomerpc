@@ -1,5 +1,5 @@
 {
-  "name": "typedrpc",
+  "name": "awesomerpc",
   "version": "0.1.0",
   "description": "A fully typed RPC framework for TypeScript",
   "keywords": [
@@ -9,13 +9,13 @@
     "websocket",
     "typed"
   ],
-  "homepage": "https://github.com/samvv/typedrpc#readme",
+  "homepage": "https://github.com/samvv/awesomerpc#readme",
   "bugs": {
-    "url": "https://github.com/samvv/typedrpc/issues"
+    "url": "https://github.com/samvv/awesomerpc/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/samvv/typedrpc.git"
+    "url": "git+https://github.com/samvv/awesomerpc.git"
   },
   "license": "MIT",
   "author": "Sam Vervaeck",

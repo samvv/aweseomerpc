@@ -1,7 +1,7 @@
-# TypedRPC
+# AwesomeRPC
 
-TypedRPC is an easy-to-use RPC framework written in TypeScript. It features
-advanced reflection capabilities, allowing you to define type-safe in nothing
+AwesomeRPC is an easy-to-use RPC framework written in TypeScript. It features
+advanced reflection capabilities, allowing you to define type-safe APIs in nothing
 more than a bit of TypeScript. No copy-pasting or code generators needed!
 
 ## Quick Start
@@ -10,77 +10,50 @@ First, you need to define a _contract_ for your API. A contract is kind of like
 a TypeScript interface: it defines what methods (and events) are allowed.
 
 ```ts
-import { types as t } from "reflect-types";
-import { contract } from "typedrpc";
+import { contract } from "awesomerpc";
 
-const productT = t.object({
-    id: t.uuid4(),
-    title: t.string(),
-    description: t.optional(t.string()),
-    createdAt: t.date(),
-    updatedAt: t.date(),
-});
-
-// This server will be reachable by any browser client that connects to it
-const petStoreServer = contract({
+// A client API that connects to the server in the browser via web sockets
+const petStoreClientContract = contract({
+    // These methods the server can call on the client at any time
     methods: {
-        getProducts: t.callable([] as const, t.array(productT)),
-        authenticate: t.callable(
-            [
-                t.string(), // username
-                t.string(), // password
-            ] as const,
-            t.boolean(), // success or not
-        ),
+        refresh: t.callable([] as const, t.void()),
+    },
+    // These events may be received by the client, coming from the server
+    events: {
+        logout: t.undefined(),
     },
 });
 ```
 
-Next, it is time to implement the client side and server side.
+Next, you need to implement this contract, like so:
 
 ```ts
-import { implement } from "typedrpc";
+import { implement } from "awesomerpc";
 
-type ServerState = {
-    loggedIn: boolean;
-}
-
-const petStoreServerImpl = implement(petStoreServer)
-    .state<ServerState>()
-    .method('authenticate', (ctx, username, password) => {
-        if (username === 'foobar' && password === '12345') {]
-            return ctx.loggedIn = true;
-        }
-        return false;
-    })
-    .method('getProducts', (_ctx) => {
-        return [
-            {
-                id: '6930bc19-6337-4d94-b31d-f81d55a85873',
-                title: 'Bag of cat food',
-                createdAt: new Date('2026-03-14T20:00:10.662Z'),
-                updatedAt: new Date('2026-03-14T20:00:28.639Z'),
-            }
-        ];
+const petStoreClientImpl = implement(petStoreClient)
+    .method('refresh', (_ctx) => {
+        window.location.reload();
     })
     .finish();
 ```
 
-Next, fire up a RPC server. For Bun with Hono, this might look something like this:
+Finally, you can connect to the server using, for example, the browser's web socket:
 
 ```ts
-import { Hono } from "hono";
-import { websocket } from "hono/bun";
-import serve from "typedrpc/lib/serve/hono"
+import { WebSocketTransport, RPC } from "awesomerpc";
 
-const app = new Hono();
+const transport = new WebSocketTransport(`http://localhost:8080/ws`);
+transport.open(); // will open the socket in the background
 
-app.get('/ws', serve(petStoreServerImpl));
+const rpc = new RPC(
+    transport,
+    petStoreClientImpl, // local API
+    petStoreServerContract, // remote API
+    {} // local state
+);
 
-export default {
-  fetch: app.fetch,
-  websocket,
-}
-
-export type App = typeof app;
+console.log(`Available products: ${await rpc.callMethod('getProducts', [])}`);
 ```
+
+For more information, read the full example in the `example/` directory.
+

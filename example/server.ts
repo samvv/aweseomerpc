@@ -1,4 +1,4 @@
-import { implement } from "typedrpc";
+import { implement } from "awesomerpc";
 import { petStoreServer } from "./contracts.js";
 import type { Product } from "./types.js";
 

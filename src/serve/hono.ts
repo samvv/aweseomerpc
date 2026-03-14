@@ -7,7 +7,7 @@ import { RawTransport } from "../transport.js";
 import type { Impl } from "../types.js";
 import { anyContract } from "../types.js";
 
-const KEY_WEBSOCKET_DATA = 'typedrpc'
+const KEY_WEBSOCKET_DATA = 'awesomerpc'
 
 export default function honoServe<L extends Impl>(local: L, createState: (ctx: Context, ws: WSContext) => L['state']) {
 

@@ -1,6 +1,6 @@
 {
   "type": "module",
   "dependencies": {
-    "typedrpc": "file:.."
+    "awesomerpc": "file:.."
   }
 }

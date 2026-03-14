@@ -1,4 +1,4 @@
-import { implement } from "typedrpc";
+import { implement } from "awesomerpc";
 import { petStoreClient } from "./contracts.js";
 
 export const petStoreClientImpl = implement(petStoreClient)

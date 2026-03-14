@@ -5,9 +5,9 @@
   "keywords": [
     "rpc",
     "typescript",
-    "types",
     "networking",
-    "websocket"
+    "websocket",
+    "typed"
   ],
   "homepage": "https://github.com/samvv/typedrpc#readme",
   "bugs": {

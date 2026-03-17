@@ -10,6 +10,7 @@ First, you need to define a _contract_ for your API. A contract is kind of like
 a TypeScript interface: it defines what methods (and events) are allowed.
 
 ```ts
+import t from "reflect-types";
 import { contract } from "awesomerpc";
 
 // A client API that connects to the server in the browser via web sockets

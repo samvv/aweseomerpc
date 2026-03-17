@@ -19,7 +19,7 @@ export const petStoreServer = contract({
 export const petStoreClient = contract({
     // These methods the server can call on the client at any time
     methods: {
-        refresh: t.callable([] as const, t.void()),
+        refresh: t.callable([] as const, t.void_()),
     },
     events: {
         logout: t.undefined(),

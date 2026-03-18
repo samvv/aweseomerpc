@@ -1,5 +1,5 @@
 import { WebSocketTransport, RPC } from "awesomerpc";
-import { clientImpl } from "./impl/client.js";
+import { clientImpl } from "./client/impl.js";
 
 const transport = new WebSocketTransport(`http://localhost:8080/ws`);
 transport.open();

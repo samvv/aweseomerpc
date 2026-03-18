@@ -1,6 +1,7 @@
 {
   "type": "module",
   "dependencies": {
-    "awesomerpc": "file:.."
+    "awesomerpc": "file:..",
+    "pino": "^10.3.1"
   }
 }

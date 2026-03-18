@@ -1,5 +1,6 @@
 import { implement } from "awesomerpc";
-import { clientContract, serverContract } from "../contracts.js";
+import { serverContract } from "./contract.js";
+import { clientContract } from "../client/contract.js";
 import type { Product } from "../types.js";
 
 const products = [

@@ -1,7 +1,7 @@
 import t from "reflect-types";
 import { contract } from "awesomerpc";
 
-import { productT } from "./types.js";
+import { productT } from "../types.js";
 
 export const serverContract = contract({
     methods: {
@@ -16,16 +16,6 @@ export const serverContract = contract({
             t.boolean(), // success or not
         ),
         logout: t.callable([] as const, t.void_()),
-    },
-});
-
-export const clientContract = contract({
-    // These methods the server can call on the client at any time
-    methods: {
-        refresh: t.callable([] as const, t.void_()),
-    },
-    events: {
-        logout: t.undefined(),
     },
 });
 

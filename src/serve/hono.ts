@@ -15,20 +15,24 @@ export default function honoServe<
   S extends object
 >(impl: Impl<L, R, S>, createState: (ctx: Context, ws: WSContext) => S, logger: Logger) {
 
-  interface SessionData {
+  interface Session {
     rpc: RPC<L, R, S>;
     transport: RawTransport;
   }
 
-  function getData(ws: WSContext): SessionData {
-    return (ws.raw as Bun.ServerWebSocket<any>).data[KEY_WEBSOCKET_DATA] as SessionData;
+  interface ServerWebSocketData {
+    [KEY_WEBSOCKET_DATA]: Session;
+  }
+
+  function getSession(ws: WSContext): Session {
+    return (ws.raw as Bun.ServerWebSocket<ServerWebSocketData>).data[KEY_WEBSOCKET_DATA];
   }
 
   return upgradeWebSocket(ctx => {
     return {
       onOpen(_evt, ws) {
         const state = createState(ctx, ws);
-        const sws = ws.raw as Bun.ServerWebSocket<any>;
+        const sws = ws.raw as Bun.ServerWebSocket<ServerWebSocketData>;
         const transport = new RawTransport(
           data => ws.send(data)
         );
@@ -41,10 +45,10 @@ export default function honoServe<
         sws.data[KEY_WEBSOCKET_DATA] = { rpc, transport };
       },
       onMessage(evt, ws) {
-        getData(ws).transport.feed(evt.data.toString());
+        getSession(ws).transport.feed(evt.data.toString());
       },
       onClose(_evt, ws) {
-        const data = getData(ws);
+        const data = getSession(ws);
         data.rpc.close();
         data.transport.close();
       },

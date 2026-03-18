@@ -1,2 +1,4 @@
-*.tgz
-/example/
+*
+!/lib/**
+!/src/**
+!/tsconfig.json

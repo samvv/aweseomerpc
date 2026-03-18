@@ -2,7 +2,7 @@ import { Subject } from "rxjs";
 
 type WriteFn = (data: string) => Promise<void> | void;
 
-export class TransportError extends Error {
+export abstract class TransportError extends Error {
 }
 
 export interface Transport {
@@ -68,10 +68,10 @@ export class RawTransport implements Transport {
 
 }
 
-export class WebSocketError extends TransportError {
+export abstract class WebSocketError extends TransportError {
 }
 
-export class OpenWebSocketError extends WebSocketError {
+export abstract class OpenWebSocketError extends WebSocketError {
 }
 
 export class TimeoutReachedWebSocketError extends OpenWebSocketError {

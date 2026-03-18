@@ -1,8 +1,12 @@
 #!/usr/bin/env bun
 
-import { command, number, option, optional, positional, rest, run, string, subcommands } from "cmd-ts"
+import { command, option, optional, positional, rest, run, string, subcommands } from "cmd-ts"
 import { anyContract, emptyContract, implement, connect, WebSocketTransport } from "awesomerpc";
-import { which } from "bun";
+import pino from "pino";
+
+const logger = pino({
+  level: process.env.AWESOMERPC_LOG_LEVEL || 'info',
+}, process.stderr);
 
 const cli = subcommands({
   name: 'awesomerpc',
@@ -35,7 +39,7 @@ const cli = subcommands({
         await ws.open();
         const local = emptyContract(); // Remote is not allowed to call any methods
         const remote = anyContract(); // We are allowed to dynamically call anthing we wish
-        const rpc = connect(implement(local, remote).finish(), ws, {});
+        const rpc = connect(implement(local, remote).finish(), ws, {}, logger);
 
         await print(await rpc.callMethod(methodName, methodArgs));
 

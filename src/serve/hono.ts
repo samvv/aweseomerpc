@@ -5,6 +5,7 @@ import type { Context } from "hono";
 import { RPC } from "../rpc.js"
 import { RawTransport } from "../transport.js";
 import type { Contract, Impl } from "../types.js";
+import type { Logger } from "../logger.js";
 
 const KEY_WEBSOCKET_DATA = 'awesomerpc'
 
@@ -12,7 +13,7 @@ export default function honoServe<
   L extends Contract,
   R extends Contract,
   S extends object
->(impl: Impl<L, R, S>, createState: (ctx: Context, ws: WSContext) => S) {
+>(impl: Impl<L, R, S>, createState: (ctx: Context, ws: WSContext) => S, logger: Logger) {
 
   interface SessionData {
     rpc: RPC<L, R, S>;
@@ -35,6 +36,7 @@ export default function honoServe<
           transport,
           impl,
           state,
+          logger,
         );
         sws.data[KEY_WEBSOCKET_DATA] = { rpc, transport };
       },

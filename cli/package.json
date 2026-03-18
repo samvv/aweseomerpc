@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "awesomerpc": "file:..",
-    "cmd-ts": "^0.15.0"
+    "cmd-ts": "^0.15.0",
+    "pino": "^10.3.1"
   }
 }

@@ -33,6 +33,7 @@ import type { Transport } from "./transport.js";
 import { EventNotFoundError, MethodNotFoundError, ProtocolError, RemoteError, RPCError, FailedValidationError } from "./error.js";
 import type { Contract, Impl, InferTuple } from "./types.js";
 import { createProxy } from "./proxy.js";
+import type { Logger } from "./logger.js"
 
 export class Resource<T> {
 
@@ -82,6 +83,7 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
     private transport: Transport,
     public impl: Impl<L, R, S>,
     private state: S,
+    private logger?: Logger,
   ) {
     // Process incoming messages
     this.readerSubscription = transport.input.subscribe(data => {
@@ -120,7 +122,7 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
 
   public async callMethod<K extends keyof R['methods'] & string>(name: K, args: InferTuple<R['methods'][K]['paramTypes']>): Promise<Infer<R['methods'][K]['returnType']>> {
     const id = this.nextMessageId++;
-    console.log(`send REQUEST ${id}`)
+    this.logger?.trace({ rpc: { direction: 'send', msgId: 'REQUEST', id, methodName: name } })
     const deferred = new Deferred<any>();
     this.pending.set(id, { name, deferred });
     const encodedArgs = args.map(this.encode.bind(this));
@@ -302,7 +304,7 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
       case MSGID_EVENT:
         {
           const [name, rawValue] = decodeEvent(msg);
-          console.log(`recv EVENT ${name}`);
+          this.logger?.trace({ rpc: { direction: 'recv', msgId: 'EVENT', eventName: name } });
           const subject = this.getEvent(name);
           if (subject === undefined) {
             throw new EventNotFoundError(name);
@@ -315,7 +317,7 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
       case MSGID_REQUEST:
       {
         const [id, name, encodedArgs] = decodeRequest(msg);
-        console.log(`recv REQUEST ${id} (${name})`);
+        this.logger?.trace({ rpc: { direction: 'recv', msgId: 'REQUEST', id, methodName: name } });
         try {
           const args = encodedArgs.map(this.decode.bind(this));
           const method = this.impl.getHandler(name);
@@ -343,6 +345,7 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
       case MSGID_STREAM_ELEMENT:
       {
         const [id, rawValue] = decodeStreamElement(msg);
+        this.logger?.trace({ rpc: { direction: 'recv', msgId: 'STREAM_ELEMENT', id } });
         const element = this.decode(rawValue);
         const stream = this.asyncGenerators.get(id);
         if (stream === undefined) {
@@ -355,6 +358,7 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
       case MSGID_STREAM_FINISH:
       {
         const [id, rawValue] = decodeStreamFinish(msg);
+        this.logger?.trace({ rpc: { direction: 'recv', msgId: 'STREAM_FINISH', id } });
         const generator = this.asyncGenerators.get(id);
         if (generator === undefined) {
           throw new RemoteError(`Async generator with ID ${id} not found.`);
@@ -367,7 +371,7 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
       case MSGID_OBSERVABLE_EVENT:
       {
         const [id, rawValue] = decodeObservableEvent(msg);
-        console.log(`recv OBSERVABLE_EVENT ${id}`);
+        this.logger?.trace({ rpc: { direction: 'recv', msgId: 'OBSERVABLE_EVENT', id } });
         const sub = this.recvSubjects.get(id);
         if (sub === undefined) {
           throw new RemoteError(`Observable with ID ${id} not found.`);
@@ -378,7 +382,7 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
       case MSGID_OBSERVABLE_COMPLETE:
       {
         const [id] = decodeObservableComplete(msg);
-        console.log(`recv OBSERVABLE_COMPLETE ${id}`);
+        this.logger?.trace({ rpc: { direction: 'recv', msgId: 'OBSERVABLE_COMPLETE', id } });
         const subscriber = this.recvSubjects.get(id);
         if (subscriber === undefined) {
           throw new Error(`Observable with ID ${id} not found.`);
@@ -390,7 +394,7 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
       case MSGID_OBSERVABLE_CLOSE:
       {
         const [id] = msg[1];
-        console.log(`recv OBSERVABLE_CLOSE ${id}`);
+        this.logger?.trace({ rpc: { direction: 'recv', msgId: 'OBSERVABLE_CLOSE', id } });
         const sub = this.sendSubscriptions.get(id);
         if (sub === undefined) {
           throw new RemoteError(`Could not find subscription with ID ${id}`);
@@ -402,7 +406,7 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
       case MSGID_RESPOND_OK:
       {
         const [id, value] = decodeRespondOk(msg);
-        console.log(`recv RESPOND_OK ${id}`);
+        this.logger?.trace({ rpc: { direction: 'recv', msgId: 'RESPOND_OK', id } });
         const result = this.pending.get(id);
         if (result === undefined) {
           throw new RemoteError(`Pending request with ID ${id} not found.`);
@@ -426,7 +430,7 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
       case MSGID_RESPOND_ERROR:
       {
         const [id, message] = decodeRespondError(msg);
-        console.log(`recv RESPOND_ERROR ${id}`);
+        this.logger?.trace({ rpc: { direction: 'recv', msgId: 'RESPOND_ERROR', id } });
         const result = this.pending.get(id);
         if (result === undefined) {
           throw new RemoteError(`Pending request with ID ${id} not found for error response`);
@@ -447,6 +451,10 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
 
 }
 
-export function connect<L extends Contract, R extends Contract, S extends object>(impl: Impl<L, R, S>, transport: Transport, state: S): RPC<L, R, S> {
-  return new RPC(transport, impl, state);
+export function connect<
+  L extends Contract,
+  R extends Contract,
+  S extends object
+>(impl: Impl<L, R, S>, transport: Transport, state: S, logger?: Logger): RPC<L, R, S> {
+  return new RPC(transport, impl, state, logger);
 }

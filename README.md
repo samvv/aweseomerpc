@@ -58,3 +58,62 @@ console.log(`Available products: ${await rpc.callMethod('getProducts', [])}`);
 
 For more information, read the full example in the `example/` directory.
 
+## API
+
+### Transports
+
+#### `new WebSocketTransport(url)`
+
+Create a new transport that uses WebSocket to send and receive messages.
+
+### Top-level Functions
+
+#### `connect(impl, state, logger?)`
+
+```ts
+import pino from "pino";
+
+import { connect } from "awesomerpc";
+
+connect(petStoreClientImpl, {});
+```
+
+## FAQ
+
+### How do I enable logging?
+
+To enable logging, you need to create and object that satisfies the `Logger`
+interface. [Pino][pino] is one such logger that is compatible with this
+interface. You can install it using:
+
+```sh
+$ npm install pino
+```
+
+Next, you need to define the logger object. In this example, the log level is
+read from the environment variable `MYAPP_LOG_LEVEL` and defaults to `info`.
+
+**src/logging.ts**
+```ts
+import pino from "pino";
+
+export const logger = pino({
+  level: process.env.MYAPP_LOG_LEVEL || 'info',
+});
+```
+
+Pass this object in while creating a connection, like so:
+
+```ts
+import { connect } from "awesomerpc";
+
+import { logger } from "./logging";
+
+connect(petStoreClientImpl, {}, logger);
+```
+
+If no logger is specified, AwesomeRPC will simply not log anything.
+
+## License
+
+This project is licensed under the MIT license. See `LICENSE.txt` for more information.

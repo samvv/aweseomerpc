@@ -164,7 +164,7 @@ export function contract<M extends Record<string, MethodContractIn>, E extends R
 
 // type FnObj<S, M extends Record<string, MethodSpec>> = { [K in keyof M]: MethodFn<S, M[K]['params'], M[K]['returns']> };
 
-class ImplBuilder<L extends Contract, R extends Contract, S extends object = {}> {
+class ImplBuilder<L extends Contract, R extends Contract> {
 
   public constructor(
     public local: L,

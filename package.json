@@ -26,7 +26,7 @@
     "test": "bun test"
   },
   "dependencies": {
-    "reflect-types": "^5.0.0",
+    "reflect-types": "^5.1.0",
     "rxjs": "^7.8.2"
   },
   "devDependencies": {

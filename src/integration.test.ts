@@ -32,7 +32,7 @@ const leftImpl = implement(leftContract, rightContract)
     getState({ state: { foo } }) {
       return foo;
     },
-    setState({ state, args: [ newFoo ] }) {
+    setState({ state }, newFoo) {
       state.foo = newFoo;
     },
   })
@@ -50,10 +50,10 @@ const rightImpl = implement(rightContract, leftContract)
     getState({ state }) {
       return state.foo;
     },
-    setState({ state,  args: [ newState ]}) {
+    setState({ state}, newState) {
       state.foo = newState;
     },
-    getLength({ args: [ s ] }) {
+    getLength(_, s) {
       return s.length;
     }
   })

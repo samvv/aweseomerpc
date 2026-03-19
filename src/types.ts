@@ -32,10 +32,9 @@ interface ClientObjStatic<L extends Contract, R extends Contract> {
 type Request<L extends Contract, R extends Contract, S, K extends keyof L['methods']> = {
   client: ClientObj<L, R>;
   state: S;
-  args: InferTuple<L['methods'][K]['paramTypes']>;
 };
 
-type MethodFn<L extends Contract, R extends Contract, S, K extends keyof L['methods']> = (req: Request<L, R, S, K>) => Infer<L['methods'][K]['returnType']>;
+type MethodFn<L extends Contract, R extends Contract, S, K extends keyof L['methods']> = (req: Request<L, R, S, K>, ...args: InferTuple<L['methods'][K]['paramTypes']>) => Infer<L['methods'][K]['returnType']>;
 
 export type MethodContract<Ps extends ReadonlyArray<Type> = ReadonlyArray<Type>, R extends Type = Type> = CallableType<Ps, R>;
 

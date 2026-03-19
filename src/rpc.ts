@@ -39,7 +39,6 @@ import { EventNotFoundError, MethodNotFoundError, ProtocolError, RemoteError, RP
 import type { Contract, Impl, InferTuple } from "./types.js";
 import { createProxy } from "./proxy.js";
 import type { Logger } from "./logger.js"
-import { write } from "bun";
 
 export class Resource<T> {
 
@@ -354,12 +353,14 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
             throw new MethodNotFoundError(name);
           }
           const validArgs = this.impl.local.validateArgs(name, args);
-          Promise.resolve(method({
+          Promise.resolve(method(
+            {
               client: this.client,
               state: this.state,
-              // We force the compiler to treat `validArgs` as correctly typed
-              args: validArgs as any
-            }))
+            },
+            // We force the compiler to treat `validArgs` as correctly typed
+            ...validArgs as any
+          ))
             .then(value => this.transport.write(JSON.stringify([ MSGID_RESPOND_OK, id, this.encode(value) ])))
             .catch(error => this.transport.write(JSON.stringify([ MSGID_RESPOND_ERROR, id, error.message ])));
         } catch (error) {

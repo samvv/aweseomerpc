@@ -1,11 +1,13 @@
 import { BehaviorSubject, Subject, Subscription } from "rxjs";
 import { type Infer } from "reflect-types";
 
-import { isPlainObject, Deferred, type JSONObject, type JSONValue, isPrimitive } from "./util.js";
+import { isPlainObject, Deferred, type JSONObject, type JSONValue, isPrimitive, isPromise } from "./util.js";
 import {
   decodeEvent,
   decodeObservableComplete,
   decodeObservableEvent,
+  decodePromiseReject,
+  decodePromiseResolve,
   decodeRequest,
   decodeRespondError,
   decodeRespondOk,
@@ -16,6 +18,8 @@ import {
   MSGID_OBSERVABLE_COMPLETE,
   MSGID_OBSERVABLE_ERROR,
   MSGID_OBSERVABLE_EVENT,
+  MSGID_PROMISE_REJECT,
+  MSGID_PROMISE_RESOLVE,
   MSGID_REQUEST,
   MSGID_RESPOND_ERROR,
   MSGID_RESPOND_OK,
@@ -26,6 +30,7 @@ import {
   TYPE_BEHAVIORSUBJECT,
   TYPE_OBJECT,
   TYPE_PRIMITIVE,
+  TYPE_PROMISE,
   TYPE_SUBJECT,
   TYPE_UNDEFINED,
 } from "./protocol.js";
@@ -34,6 +39,7 @@ import { EventNotFoundError, MethodNotFoundError, ProtocolError, RemoteError, RP
 import type { Contract, Impl, InferTuple } from "./types.js";
 import { createProxy } from "./proxy.js";
 import type { Logger } from "./logger.js"
+import { write } from "bun";
 
 export class Resource<T> {
 
@@ -66,11 +72,13 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
   private nextMessageId = 0;
   private nextStreamId = 0;
   private nextSubjectId = 0;
+  private nextPromiseId = 0;
   private sendSubscriptions = new Map<number, Subscription>();
 
   // For receiving data
   private recvSubjects = new Map<number, Subject<any>>();
   private pending = new Map<number, { name: keyof R['methods'] & string; deferred: Deferred<any> }>();
+  private pendingPromises = new Map<number, Deferred<any>>();
   private asyncGenerators = new Map<number, { buffer: any[], deferred: Deferred<void> }>();
   private events: { [K in keyof L['events']]: Subject<Infer<L['events'][K]['ty']>> } = Object.create(null);
 
@@ -136,6 +144,17 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
     }
     if (isPrimitive(value)) {
       return [ TYPE_PRIMITIVE, value ];
+    }
+    if (isPromise(value)) {
+      const id = this.nextPromiseId++;
+      value
+        .then(result => {
+          this.transport.write(JSON.stringify([ MSGID_PROMISE_RESOLVE, id, this.encode(result) ]));
+        })
+        .catch(error => {
+          this.transport.write(JSON.stringify([ MSGID_PROMISE_REJECT, id, error.message.toString() ]));
+        });
+      return [ TYPE_PROMISE, id ];
     }
     if (value instanceof BehaviorSubject) {
       const id = this.nextSubjectId++;
@@ -214,6 +233,16 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
           }
           return value[1].map(this.decode.bind(this));
         }
+      case TYPE_PROMISE:
+        {
+          if (typeof(value[1]) !== 'number') {
+            throw new Error(`Could not decode value: promise ID not a number.`);
+          }
+          const id = value[1];
+          const deferred = new Deferred<any>();
+          this.pendingPromises.set(id, deferred);
+          return deferred.promise;
+        }
       case TYPE_OBJECT:
         {
           if (!isPlainObject(value[1])) {
@@ -228,7 +257,7 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
       case TYPE_ASYNC_GENERATOR:
       {
         if (typeof(value[1]) !== 'number') {
-          throw new Error(`Could not decode value: stream ID not a number.`);
+          throw new Error(`Could not decode value: async generator ID not a number.`);
         }
         const id = value[1];
         const buffer: any[] = [];
@@ -366,6 +395,30 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
         generator.buffer.push({ done: true, value: this.decode(rawValue) });
         generator.deferred.accept();
         this.asyncGenerators.delete(id);
+        break;
+      }
+      case MSGID_PROMISE_RESOLVE:
+      {
+        const [id, rawValue] = decodePromiseResolve(msg);
+        this.logger?.trace({ rpc: { direction: 'recv', msgId: 'PROMISE_RESOLVE', id } });
+        const deferred = this.pendingPromises.get(id);
+        if (deferred === undefined) {
+          throw new RemoteError(`Promise with ID ${id} was not found.`);
+        }
+        this.pendingPromises.delete(id);
+        deferred.accept(this.decode(rawValue))
+        break;
+      }
+      case MSGID_PROMISE_REJECT:
+      {
+        const [id, errorMessage] = decodePromiseReject(msg);
+        this.logger?.trace({ rpc: { direction: 'recv', msgId: 'PROMISE_REJECT', id } });
+        const deferred = this.pendingPromises.get(id);
+        if (deferred === undefined) {
+          throw new RemoteError(`Promise with ID ${id} was not found.`);
+        }
+        this.pendingPromises.delete(id);
+        deferred.reject(new Error(errorMessage));
         break;
       }
       case MSGID_OBSERVABLE_EVENT:

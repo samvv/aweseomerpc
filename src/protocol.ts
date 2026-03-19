@@ -8,6 +8,7 @@ export const TYPE_OBJECT          = 3;
 export const TYPE_UNDEFINED       = 4;
 export const TYPE_SUBJECT         = 5;
 export const TYPE_BEHAVIORSUBJECT = 6;
+export const TYPE_PROMISE         = 7;
 
 export const MSGID_REQUEST             = 0;
 export const MSGID_RESPOND_OK          = 1;
@@ -19,6 +20,8 @@ export const MSGID_OBSERVABLE_EVENT    = 6;
 export const MSGID_OBSERVABLE_COMPLETE = 7;
 export const MSGID_OBSERVABLE_ERROR    = 8;
 export const MSGID_OBSERVABLE_CLOSE    = 9;
+export const MSGID_PROMISE_RESOLVE     = 10;
+export const MSGID_PROMISE_REJECT      = 11;
 
 export function isTypeId(value: number): boolean {
   // Keep in sync with the TYPE_* defitions
@@ -41,6 +44,12 @@ function checkMethodId(value: any): asserts value is number {
 function checkObservableId(value: any): asserts value is number {
   if (!Number.isInteger(value)) {
     throw new ProtocolError(`Expected observable ID to be an integer.`);
+  }
+}
+
+function checkPromiseId(value: any): asserts value is number {
+  if (!Number.isInteger(value)) {
+    throw new ProtocolError(`Expected promise ID to be an integer.`);
   }
 }
 
@@ -152,4 +161,27 @@ export function decodeObservableClose(msg: JSONArray): [number] {
   const id = msg[1]!;
   checkObservableId(id);
   return [id];
+}
+
+export function decodePromiseReject(msg: JSONArray): [number, string] {
+  if (msg.length !== 3) {
+    throw new ProtocolError(`Expected PROMISE_REJECT message to contain 3 elements.`);
+  }
+  const id = msg[1]!;
+  checkPromiseId(id);
+  const message = msg[2]!;
+  if (typeof(message) !== 'string') {
+    throw new ProtocolError(`Expected error message in PROMISE_REJECT to be of type string`);
+  }
+  return [id, message];
+}
+
+export function decodePromiseResolve(msg: JSONArray): [number, JSONValue] {
+  if (msg.length !== 3) {
+    throw new ProtocolError(`Expected PROMISE_RESOLVE message to contain 3 elements.`);
+  }
+  const id = msg[1]!;
+  checkPromiseId(id);
+  const rawValue = msg[2]!;
+  return [id, rawValue];
 }

@@ -5,6 +5,7 @@ import { contract, implement } from "./types.js"
 import { createDuplex } from "./transport.js"
 import { connect } from "./rpc.js"
 import { FailedValidationError } from "./error.js";
+import { sleep } from "bun";
 
 const leftContract = contract({
   methods: {
@@ -22,6 +23,7 @@ const rightContract = contract({
     getState: t.callable([] as const, t.number()),
     setState: t.callable([ t.number() ] as const, t.undefined()),
     getLength: t.callable([ t.string() ] as const, t.number()),
+    slow11: t.callable([] as const, t.object({ slow: t.promise(t.number()) })),
   }
 });
 
@@ -49,6 +51,9 @@ const rightImpl = implement(rightContract, leftContract)
   .methods({
     getState({ state }) {
       return state.foo;
+    },
+    slow11: () => {
+      return { slow: (async () => { await sleep(250); return 11; })() };
     },
     setState({ state}, newState) {
       state.foo = newState;
@@ -110,4 +115,15 @@ test('can send events', done => {
 
   right.notify('someevent', 'foo');
 
+});
+
+
+test('can send a promise that resolves later', async () => {
+  const [leftTransport, rightTransport] = createDuplex();
+  const left = connect(leftImpl, leftTransport, { foo: 42 });
+  const right = connect(rightImpl, rightTransport, { foo: 33 });
+
+  const { slow } = await left.callMethod('slow11', []);
+
+  expect(slow).resolves.toStrictEqual(11);
 });

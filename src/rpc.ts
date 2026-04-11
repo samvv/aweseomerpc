@@ -69,7 +69,7 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
 
   // For sending data
   private nextMessageId = 0;
-  private nextStreamId = 0;
+  private nextAsyncIteratorId = 0;
   private nextSubjectId = 0;
   private nextPromiseId = 0;
   private sendSubscriptions = new Map<number, Subscription>();
@@ -186,7 +186,7 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
       return [ TYPE_SUBJECT, id ];
     }
     if (value[Symbol.asyncIterator] !== undefined) {
-      const id = this.nextStreamId++;
+      const id = this.nextAsyncIteratorId++;
       (async () => {
         const iter = value[Symbol.asyncIterator]();
         for (;;) {

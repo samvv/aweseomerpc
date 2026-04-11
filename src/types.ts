@@ -34,8 +34,6 @@ type Request<L extends Contract, R extends Contract, S, K extends keyof L['metho
   state: S;
 };
 
-type MethodFn<L extends Contract, R extends Contract, S, K extends keyof L['methods']> = (req: Request<L, R, S, K>, ...args: InferTuple<L['methods'][K]['paramTypes']>) => Infer<L['methods'][K]['returnType']>;
-
 export type MethodContract<Ps extends ReadonlyArray<Type> = ReadonlyArray<Type>, R extends Type = Type> = CallableType<Ps, R>;
 
 type MethodContractIn = MethodContract;
@@ -163,6 +161,14 @@ export function contract<M extends Record<string, MethodContractIn>, E extends R
 
 // type FnObj<S, M extends Record<string, MethodSpec>> = { [K in keyof M]: MethodFn<S, M[K]['params'], M[K]['returns']> };
 
+type SyncOrAsync<T> = T | Promise<T>
+
+type ImplMethodFn<L extends Contract, R extends Contract, S, K extends keyof L['methods']>
+  = (req: Request<L, R, S, K>, ...args: InferTuple<L['methods'][K]['paramTypes']>)
+    => Infer<L['methods'][K]['returnType']> extends void
+      ? void
+      : SyncOrAsync<Infer<L['methods'][K]['returnType']>>
+
 class ImplBuilder<L extends Contract, R extends Contract> {
 
   public constructor(
@@ -176,7 +182,7 @@ class ImplBuilder<L extends Contract, R extends Contract> {
     return new ImplBuilder2(this.local, this.remote, {});
   }
 
-  public methods<N2 extends keyof L['methods']>(procs: { [K in N2]: MethodFn<L, R, {}, K> }) {
+  public methods<N2 extends keyof L['methods']>(procs: { [K in N2]: ImplMethodFn<L, R, {}, K> }) {
     return new ImplBuilder2<L, R, keyof typeof procs, {}>(
       this.local,
       this.remote,
@@ -184,7 +190,7 @@ class ImplBuilder<L extends Contract, R extends Contract> {
     );
   }
 
-  public method<K extends string>(name: K, proc: MethodFn<L, R, {}, K>) {
+  public method<K extends string>(name: K, proc: ImplMethodFn<L, R, {}, K>) {
     return new ImplBuilder2<L, R, K, {}>(
       this.local,
       this.remote,
@@ -207,17 +213,17 @@ class ImplBuilder2<L extends Contract, R extends Contract, Names extends keyof L
   public constructor(
     public local: L,
     public remote: R,
-    public procs: { [K in Names]: MethodFn<L, R, S, K> },
+    public procs: { [K in Names]: ImplMethodFn<L, R, S, K> },
   ) {
 
   }
 
-  public methods<N2 extends keyof L['methods']>(procs: { [K in N2]: MethodFn<L, R, S, K> }) {
+  public methods<N2 extends keyof L['methods']>(procs: { [K in N2]: ImplMethodFn<L, R, S, K> }) {
     const newM = Object.assign(this.procs, procs);
     return new ImplBuilder2<L, R, keyof typeof newM, S>(this.local, this.remote, newM);
   }
 
-  public method<K extends string>(name: K, proc: MethodFn<L, R, S, K>): ImplBuilder2<L, R, Names | K, S> {
+  public method<K extends string>(name: K, proc: ImplMethodFn<L, R, S, K>): ImplBuilder2<L, R, Names | K, S> {
     const newM = assign(this.procs, name, proc);
     return new ImplBuilder2<L, R, keyof typeof newM, S>(this.local, this.remote, newM);
   }
@@ -239,12 +245,12 @@ export class Impl<
   public constructor(
     public local: L,
     public remote: R,
-    public procs: { [K in keyof L['methods']]: MethodFn<L, R, S, K> },
+    public procs: { [K in keyof L['methods']]: ImplMethodFn<L, R, S, K> },
   ) {
 
   }
 
-  public getHandler<K extends keyof L['methods']>(name: K): MethodFn<L, R, S, K> {
+  public getHandler<K extends keyof L['methods']>(name: K): ImplMethodFn<L, R, S, K> {
     return this.procs[name];
   }
 

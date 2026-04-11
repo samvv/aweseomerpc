@@ -27,7 +27,7 @@ export function initClientState(): ClientState {
 
 export const serverImpl = implement(serverContract, clientContract)
   .state<ClientState>()
-  .method('login', ({ state, args: [ username, password ] }) => {
+  .method('login', ({ state }, username, password) => {
     if (username === 'foobar' && password === '12345') {
       state.user = username;
       return true;
@@ -38,7 +38,7 @@ export const serverImpl = implement(serverContract, clientContract)
     req.state.user = null;
     req.client.notify('logout');
   })
-  .method('addToBasket', ({ state, args: [ productId ] }) => {
+  .method('addToBasket', ({ state }, productId) => {
     const count = state.basket.get(productId) ?? 0;
     state.basket.set(productId, count + 1);
   })

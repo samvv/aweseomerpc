@@ -1,36 +1,65 @@
-import { Subject } from "rxjs";
-
-type WriteFn = (data: string) => Promise<void> | void;
+import { firstValueFrom, Subject, Subscription } from "rxjs";
 
 export abstract class TransportError extends Error {
+
 }
 
 export interface Transport {
-  write: WriteFn;
-  open(): Promise<void>;
+  write(data: string): Promise<void>;
+  read(): Promise<string>;
   close(): Promise<void>;
-  readonly input: Subject<string>;
+  readonly errors: Subject<Error>;
 }
 
+export class ReadBuffer {
+
+  private buffer: string[] = [];
+  private fillEvents = new Subject<void>();
+
+  private async waitForData() {
+    if (this.buffer.length > 0) {
+      return;
+    }
+    return firstValueFrom(this.fillEvents);
+  }
+
+  public feed(data: string) {
+    this.buffer.push(data);
+    this.fillEvents.next();
+  }
+
+  public async read(): Promise<string> {
+    await this.waitForData();
+    return this.buffer.shift()!;
+  }
+
+}
 export class DummyTransport implements Transport {
+
+  private readBuffer = new ReadBuffer();
+  private inputSub: Subscription;
+
+  public readonly errors = new Subject<Error>();
 
   public constructor(
     public input: Subject<string>,
     public output: Subject<string>,
   ) {
+    this.inputSub = input.subscribe(data => {
+      this.readBuffer.feed(data);
+    });
+  }
 
+  public async read(): Promise<string> {
+    return this.readBuffer.read();
   }
 
   public async write(data: string): Promise<void> {
     this.output.next(data);
   }
 
-  public async open(): Promise<void> {
-     
-  }
-
-  public async close(): Promise<void> {
-      
+  public async close() {
+    this.inputSub.unsubscribe();
   }
 
 }
@@ -42,30 +71,6 @@ export function createDuplex(): [Transport, Transport] {
     new DummyTransport(left, right),
     new DummyTransport(right, left),
   ];
-}
-
-export class RawTransport implements Transport {
-
-  public readonly input = new Subject<string>();
-
-  public constructor(
-    public write: WriteFn,
-  ) {
-
-  }
-
-  public feed(data: string): void {
-    this.input.next(data);
-  }
-
-  public async open(): Promise<void> {
-
-  }
-
-  public async close(): Promise<void> {
-      
-  }
-
 }
 
 export abstract class WebSocketError extends TransportError {
@@ -96,63 +101,62 @@ const DEFAULT_WEBSOCKET_TIMEOUT = 10000;
 
 export class WebSocketTransport implements Transport {
 
-  ws?: WebSocket;
+  private readBuffer = new ReadBuffer();
 
-  readonly input = new Subject<string>();
+  public readonly errors = new Subject<Error>();
 
-  // Configuration options
-  timeout: number;
-
-  public constructor(public url: string, { timeout = DEFAULT_WEBSOCKET_TIMEOUT } = {}) {
-    this.timeout = timeout;
+  public constructor(public ws: WebSocket) {
+    ws.addEventListener('message', event => {
+      this.readBuffer.feed(event.data.toString());
+    });
+    ws.addEventListener('error', this.onError);
   }
 
   private onError = () => {
-    // TODO
+    this.errors.next(new GenericWebSocketError());
   }
 
-  public open(): Promise<void> {
+  public read(): Promise<string> {
+    return this.readBuffer.read();
+  }
+
+  public static open(url: string, { timeout = DEFAULT_WEBSOCKET_TIMEOUT } = {}): Promise<void> {
     return new Promise((accept, reject) => {
-      this.ws = new WebSocket(this.url);
+      const ws = new WebSocket(url);
       let didOpen = false;
       const interval = setTimeout(() => {
-        this.ws!.close();
+        ws.close();
         reject(new TimeoutReachedWebSocketError());
-      }, this.timeout);
+      }, timeout);
       const onError = () => {
         clearTimeout(interval);
         reject(didOpen ? new GenericWebSocketError() : new GenericOpenWebSocketError());
       }
       const onOpen = () => {
-        this.ws!.removeEventListener('open', onOpen);
-        this.ws!.removeEventListener('error', onError);
+        ws.removeEventListener('open', onOpen);
+        ws.removeEventListener('error', onError);
         didOpen = true;
         clearTimeout(interval);
-        this.ws!.addEventListener('message', event => {
-          this.input.next(event.data.toString());
-        });
-        this.ws!.addEventListener('error', this.onError);
         accept();
       }
-      this.ws.addEventListener('error', onError);
-      this.ws.addEventListener('open', onOpen);
+      ws.addEventListener('error', onError);
+      ws.addEventListener('open', onOpen);
     });
   }
 
   public close(): Promise<void> {
     return new Promise(accept => {
-      const ws = this.ws!;
-      if (ws.readyState === WebSocket.CLOSED) {
+      if (this.ws.readyState === WebSocket.CLOSED) {
         accept();
         return;
       }
       const onClose = () => {
-        ws.removeEventListener('close', onClose);
-        ws.removeEventListener('error', this.onError);
+        this.ws.removeEventListener('close', onClose);
+        this.ws.removeEventListener('error', this.onError);
         accept();
       }
-      ws.addEventListener('close', onClose);
-      ws.close();
+      this.ws.addEventListener('close', onClose);
+      this.ws.close();
     });
   }
 
@@ -162,41 +166,3 @@ export class WebSocketTransport implements Transport {
 
 }
 
-export class StableTransport implements Transport {
-
-  readonly input = new Subject<string>();
-
-  private active?: { transport: Transport; opened: Promise<void>; }
-
-  private buffer: string[] = [];
-
-  public constructor(private factory: () => Transport) {
-    
-  }
-
-  public async write(data: string): Promise<void> {
-    if (this.active === undefined) {
-      this.buffer.push(data);
-      return;
-    }
-    await this.active.opened;
-    return this.active.transport.write(data);
-  }
-
-  public async open(): Promise<void> {
-    const transport = this.factory();
-    this.active = {
-      transport,
-      opened: transport.open(),
-    }
-    // TODO reconnect on failure
-  }
-
-  public async close(): Promise<void> {
-    if (this.active !== undefined) {
-      await this.active.transport.close();
-      delete this.active;
-    }
-  }
-
-}

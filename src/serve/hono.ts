@@ -3,11 +3,39 @@ import type { WSContext } from "hono/ws";
 import type { Context } from "hono";
 
 import { RPC } from "../rpc.js"
-import { RawTransport } from "../transport.js";
+import { ReadBuffer, type Transport } from "../transport.js";
 import type { Contract, Impl } from "../types.js";
 import type { Logger } from "../logger.js";
+import type { ServerWebSocket } from "bun";
 
 const KEY_WEBSOCKET_DATA = 'awesomerpc'
+
+class ServerWebSocketTransport implements Transport {
+
+  private readBuffer = new ReadBuffer();
+
+  public constructor(
+    public ws: ServerWebSocket<any>,
+  ) {
+  }
+
+  public feed(data: string): void {
+    this.readBuffer.feed(data);
+  }
+
+  public read(): Promise<string> {
+    return this.readBuffer.read();
+  }
+
+  public async write(data: string): Promise<void> {
+    this.ws.send(data);
+  }
+
+  public async close(): Promise<void> {
+
+  }
+
+}
 
 export default function honoServe<
   L extends Contract,
@@ -17,7 +45,7 @@ export default function honoServe<
 
   interface Session {
     rpc: RPC<L, R, S>;
-    transport: RawTransport;
+    transport: ServerWebSocketTransport;
   }
 
   interface ServerWebSocketData {
@@ -33,9 +61,7 @@ export default function honoServe<
       onOpen(_evt, ws) {
         const state = createState(ctx, ws);
         const sws = ws.raw as Bun.ServerWebSocket<ServerWebSocketData>;
-        const transport = new RawTransport(
-          data => ws.send(data)
-        );
+        const transport = new ServerWebSocketTransport(sws);
         const rpc = new RPC(
           transport,
           impl,

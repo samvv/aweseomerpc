@@ -81,9 +81,7 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
   private asyncGenerators = new Map<number, { buffer: any[], deferred: Deferred<void> }>();
   private events: { [K in keyof L['events']]: Subject<Infer<L['events'][K]['ty']>> } = Object.create(null);
 
-  // Internal resources
-  private readerSubscription: Subscription;
-
+  // Used to build the Request
   private client = createProxy(this);
 
   public constructor(
@@ -93,17 +91,7 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
     private logger?: Logger,
   ) {
     // Process incoming messages
-    this.readerSubscription = transport.input.subscribe(data => {
-      try {
-        this.processMessage(data);
-      } catch (error) {
-        if (error instanceof RPCError) {
-          console.warn(`[RPC] ${error}`);
-        } else {
-          console.error(error);
-        }
-      }
-    });
+    transport.input.on('data', this.tryProcessMessage);
   }
 
   public getEvent<K extends keyof L['events'] & string>(name: K): Subject<Infer<L['events'][K]['ty']>>;
@@ -120,7 +108,7 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
 
 
   public async notify<K extends keyof R['events']>(eventName: K, value: Infer<R['events'][K]['ty']>): Promise<void> {
-    await this.transport.write(JSON.stringify([ MSGID_EVENT, eventName, this.encode(value) ]));
+    await this.transport.output.write(JSON.stringify([ MSGID_EVENT, eventName, this.encode(value) ]));
   }
 
   public hasMethod(name: string) {
@@ -133,7 +121,7 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
     const deferred = new Deferred<any>();
     this.pending.set(id, { name, deferred });
     const encodedArgs = args.map(this.encode.bind(this));
-    await this.transport.write(JSON.stringify([ MSGID_REQUEST, id, name, encodedArgs ]));
+    await this.transport.output.write(JSON.stringify([ MSGID_REQUEST, id, name, encodedArgs ]));
     return deferred.promise;
   }
 
@@ -148,10 +136,10 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
       const id = this.nextPromiseId++;
       value
         .then(result => {
-          this.transport.write(JSON.stringify([ MSGID_PROMISE_RESOLVE, id, this.encode(result) ]));
+          this.transport.output.write(JSON.stringify([ MSGID_PROMISE_RESOLVE, id, this.encode(result) ]));
         })
         .catch(error => {
-          this.transport.write(JSON.stringify([ MSGID_PROMISE_REJECT, id, error.message.toString() ]));
+          this.transport.output.write(JSON.stringify([ MSGID_PROMISE_REJECT, id, error.message.toString() ]));
         });
       return [ TYPE_PROMISE, id ];
     }
@@ -159,13 +147,13 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
       const id = this.nextSubjectId++;
       this.sendSubscriptions.set(id, value.subscribe({
         next: val => {
-          this.transport.write(JSON.stringify([ MSGID_OBSERVABLE_EVENT, id, this.encode(val) ]));
+          this.transport.output.write(JSON.stringify([ MSGID_OBSERVABLE_EVENT, id, this.encode(val) ]));
         },
         error: err => {
-          this.transport.write(JSON.stringify([ MSGID_OBSERVABLE_ERROR, id, err.toString() ]));
+          this.transport.output.write(JSON.stringify([ MSGID_OBSERVABLE_ERROR, id, err.toString() ]));
         },
         complete: () => {
-          this.transport.write(JSON.stringify([ MSGID_OBSERVABLE_COMPLETE, id ]));
+          this.transport.output.write(JSON.stringify([ MSGID_OBSERVABLE_COMPLETE, id ]));
         },
       }));
       return [ TYPE_BEHAVIORSUBJECT, id, this.encode(value.value) ];
@@ -174,13 +162,13 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
       const id = this.nextSubjectId++;
       this.sendSubscriptions.set(id, value.subscribe({
         next: val => {
-          this.transport.write(JSON.stringify([ MSGID_OBSERVABLE_EVENT, id, this.encode(val) ]));
+          this.transport.output.write(JSON.stringify([ MSGID_OBSERVABLE_EVENT, id, this.encode(val) ]));
         },
         error: err => {
-          this.transport.write(JSON.stringify([ MSGID_OBSERVABLE_ERROR, id, err.toString() ]));
+          this.transport.output.write(JSON.stringify([ MSGID_OBSERVABLE_ERROR, id, err.toString() ]));
         },
         complete: () => {
-          this.transport.write(JSON.stringify([ MSGID_OBSERVABLE_COMPLETE, id ]));
+          this.transport.output.write(JSON.stringify([ MSGID_OBSERVABLE_COMPLETE, id ]));
         },
       }));
       return [ TYPE_SUBJECT, id ];
@@ -194,10 +182,10 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
             // TODO expose next() as an RPC call
             const { done, value } = await iter.next();
             if (done) {
-              this.transport.write(JSON.stringify([ MSGID_STREAM_FINISH, id, this.encode(value) ]));
+              this.transport.output.write(JSON.stringify([ MSGID_STREAM_FINISH, id, this.encode(value) ]));
               break;
             }
-            this.transport.write(JSON.stringify([ MSGID_STREAM_ELEMENT, id, this.encode(value) ]));
+            this.transport.output.write(JSON.stringify([ MSGID_STREAM_ELEMENT, id, this.encode(value) ]));
         }
       })();
       return [ TYPE_ASYNC_GENERATOR, id ];
@@ -308,7 +296,7 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
         // }
 
         const close = () => {
-          this.transport.write(JSON.stringify([ MSGID_OBSERVABLE_CLOSE, id ]));
+          this.transport.output.write(JSON.stringify([ MSGID_OBSERVABLE_CLOSE, id ]));
         }
 
         return new Resource(subject, close);
@@ -361,11 +349,11 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
             // We force the compiler to treat `validArgs` as correctly typed
             ...validArgs as any
           ))
-            .then(value => this.transport.write(JSON.stringify([ MSGID_RESPOND_OK, id, this.encode(value) ])))
-            .catch(error => this.transport.write(JSON.stringify([ MSGID_RESPOND_ERROR, id, error.message ])));
+            .then(value => this.transport.output.write(JSON.stringify([ MSGID_RESPOND_OK, id, this.encode(value) ])))
+            .catch(error => this.transport.output.write(JSON.stringify([ MSGID_RESPOND_ERROR, id, error.message ])));
         } catch (error) {
           if (error instanceof RemoteError) {
-            this.transport.write(JSON.stringify([ MSGID_RESPOND_ERROR, id, error.message ]));
+            this.transport.output.write(JSON.stringify([ MSGID_RESPOND_ERROR, id, error.message ]));
             break;
           }
           throw error;
@@ -499,8 +487,20 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
     }
   }
 
+  private tryProcessMessage = (data: string) => {
+    try {
+      this.processMessage(data);
+    } catch (error) {
+      if (error instanceof RPCError) {
+        console.warn(`[RPC] ${error}`);
+      } else {
+        console.error(error);
+      }
+    }
+  }
+
   public close(): void {
-    this.readerSubscription.unsubscribe();
+    this.transport.input.removeListener('data', this.tryProcessMessage);
   }
 
 }

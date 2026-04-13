@@ -1,11 +1,13 @@
 import { test, expect } from "bun:test"
 import t from "reflect-types";
+import stream from "node:stream"
 
 import { contract, implement } from "./types.js"
-import { createDuplex } from "./transport.js"
-import { connect } from "./rpc.js"
+import { connect, RPC } from "./rpc.js"
 import { FailedValidationError } from "./error.js";
 import { sleep } from "bun";
+import type { Transport } from "./transport.js";
+import serveBunTCP from "./serve/bunTCP.js";
 
 const leftContract = contract({
   methods: {
@@ -26,6 +28,30 @@ const rightContract = contract({
     slow11: t.callable([] as const, t.object({ slow: t.promise(t.number()) })),
   }
 });
+
+function createDuplex(): [Transport, Transport] {
+
+  const input1 = new stream.Readable({ read() { } });
+  const input2 = new stream.Readable({ read() { } });
+
+  const output1 = new stream.Writable({
+    write(chunk, encoding, callback) {
+      input2.push(chunk, encoding);
+      callback();
+    },
+  });
+  const output2 = new stream.Duplex({
+    write(chunk, encoding, callback) {
+      input1.push(chunk, encoding);
+      callback();
+    },
+  });
+
+  return [
+    { input: input1, output: output1, async close() {}, },
+    { input: input2, output: output2, async close() {}, },
+  ];
+}
 
 const leftImpl = implement(leftContract, rightContract)
   .state<{ foo: number; }>()
@@ -126,4 +152,38 @@ test('can send a promise that resolves later', async () => {
   const { slow } = await left.callMethod('slow11', []);
 
   expect(slow).resolves.toStrictEqual(11);
+});
+
+test('can send over TCP', async () => {
+  serveBunTCP({ impl: rightImpl, port: 2000, createState: () => ({ foo: 33 }) });
+  await sleep(100);
+  const socket = await Bun.connect<Transport>({
+    hostname: 'localhost',
+    port: 2000,
+    socket: {
+      async open(socket) {
+        const transport = {
+          input: new stream.Readable({ read() { } }),
+          output: new stream.Writable({
+            write(chunk, encoding, callback) {
+              socket.write(chunk);
+            },
+          }),
+          async close() {
+          }
+        }
+        const left = connect(
+          leftImpl,
+          transport,
+          { foo: 42 },
+        );
+        socket.data = transport;
+        expect(await left.callMethod('getLength', ["foobar"])).toStrictEqual(6);
+        expect(await left.callMethod('getState', [])).toStrictEqual(33);
+      },
+      data(socket, data) {
+        socket.data.input.push(data);
+      },
+    }
+  });
 });

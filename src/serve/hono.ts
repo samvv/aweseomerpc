@@ -1,34 +1,37 @@
 import { upgradeWebSocket } from "hono/bun";
 import type { WSContext } from "hono/ws";
 import type { Context } from "hono";
+import * as stream from "node:stream"
+import type { ServerWebSocket } from "bun";
 
 import { RPC } from "../rpc.js"
-import { ReadBuffer, type Transport } from "../transport.js";
 import type { Contract, Impl } from "../types.js";
 import type { Logger } from "../logger.js";
-import type { ServerWebSocket } from "bun";
+import type { Transport } from "../transport.js";
 
 const KEY_WEBSOCKET_DATA = 'awesomerpc'
 
 class ServerWebSocketTransport implements Transport {
 
-  private readBuffer = new ReadBuffer();
+  public input = new stream.Readable();
+  public output: stream.Writable;
 
   public constructor(
     public ws: ServerWebSocket<any>,
   ) {
+    this.output = new stream.Writable({
+      write(chunk, encoding, callback) {
+        if (chunk instanceof Buffer) {
+          chunk = chunk.toString(encoding);
+        }
+        ws.send(chunk);
+        callback();
+      },
+    });
   }
 
   public feed(data: string): void {
-    this.readBuffer.feed(data);
-  }
-
-  public read(): Promise<string> {
-    return this.readBuffer.read();
-  }
-
-  public async write(data: string): Promise<void> {
-    this.ws.send(data);
+    this.input.push(data);
   }
 
   public async close(): Promise<void> {

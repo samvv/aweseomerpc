@@ -13,12 +13,17 @@ const KEY_WEBSOCKET_DATA = 'awesomerpc'
 
 class ServerWebSocketTransport implements Transport {
 
-  public input = new stream.Readable();
+  public input: stream.Readable;
   public output: stream.Writable;
 
   public constructor(
     public ws: ServerWebSocket<any>,
   ) {
+    this.input = new stream.Readable({
+      read(_size) {
+
+      },
+    });
     this.output = new stream.Writable({
       write(chunk, encoding, callback) {
         if (chunk instanceof Buffer) {

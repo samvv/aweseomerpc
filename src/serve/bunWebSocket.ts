@@ -47,7 +47,9 @@ export type ServeOptions<
 > = {
   impl: Impl<L, R, S>;
   createState: (ws: ServerWebSocket<unknown>) => S;
+  port?: number;
   logger?: Logger;
+  hostname?: string;
 }
 
 type WebSocketData<
@@ -66,10 +68,14 @@ export default function honoServe<
 >({
   impl,
   logger,
+  hostname = 'localhost',
+  port = 8080,
   createState,
 }: ServeOptions<L, R, S>) {
 
   return Bun.serve<WebSocketData<L, R, S> | null>({
+    hostname,
+    port,
     fetch(req, server) {
       if (server.upgrade(req, { data: null })) {
         return; // do not return a Response

@@ -3,7 +3,7 @@ import t from "reflect-types";
 import stream from "node:stream"
 
 import { contract, implement } from "./types.js"
-import { connect, RPC } from "./rpc.js"
+import { connect } from "./rpc.js"
 import { FailedValidationError } from "./error.js";
 import { sleep } from "bun";
 import type { Transport } from "./transport.js";
@@ -101,6 +101,10 @@ test('can call methods on both sides', async () => {
   expect(await left.callMethod('getState', [])).toStrictEqual(33);
   expect(await right.callMethod('getState', [])).toStrictEqual(42);
 
+  expect(await left.getLength("foobar")).toStrictEqual(6);
+  expect(await left.getState()).toStrictEqual(33);
+  expect(await right.getState()).toStrictEqual(42);
+
   left.close();
   right.close();
 
@@ -149,9 +153,11 @@ test('can send a promise that resolves later', async () => {
   const left = connect(leftImpl, leftTransport, { foo: 42 });
   const right = connect(rightImpl, rightTransport, { foo: 33 });
 
-  const { slow } = await left.callMethod('slow11', []);
-
+  const { slow } = await left.slow11();
   expect(slow).resolves.toStrictEqual(11);
+
+  const { slow: slow2 } = await left.callMethod('slow11', []);
+  expect(slow2).resolves.toStrictEqual(11);
 });
 
 test('can send over TCP', async () => {

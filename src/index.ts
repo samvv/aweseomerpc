@@ -1,5 +1,5 @@
 export * from "./reflect.js"
 export { type Transport, WebSocketTransport } from "./transport.js"
-export { type ClientObj, implement, contract, emptyContract, anyContract } from "./types.js"
+export { type Client, implement, contract, emptyContract, anyContract } from "./types.js"
 export { RPC, type AnyMethods, type AnyEvents, connect } from "./rpc.js"
 export type { JSONValue, JSONArray, JSONObject } from "./util.js"

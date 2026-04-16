@@ -17,13 +17,13 @@ export type InferTuple<Ps extends ReadonlyArray<Type>> = { [I in keyof Ps]: Infe
 type Promisify<T extends CallableType>
   = (...args: Parameters<Infer<T>>) => Promise<Awaited<ReturnType<Infer<T>>>>;
 
-export type ClientObj<L extends Contract, R extends Contract, S>
+export type Client<L extends Contract, R extends Contract, S>
   = { [K in keyof R['methods']]: Promisify<R['methods'][K]>; }
   & { [K in keyof L['events']]: Subject<L['events'][K]['ty']>; }
   & RPC<L, R, S>;
 
 type Request<L extends Contract, R extends Contract, S, K extends keyof L['methods']> = {
-  client: ClientObj<L, R, S>;
+  client: Client<L, R, S>;
   state: S;
 };
 

@@ -1,8 +1,8 @@
 
 import type { RPC } from "./rpc.js";
-import type { ClientObj, Contract } from "./types.js";
+import type { Client, Contract } from "./types.js";
 
-export function createProxy<L extends Contract, R extends Contract, S>(rpc: RPC<L, R, S>): ClientObj<L, R, S> {
+export function createProxy<L extends Contract, R extends Contract, S>(rpc: RPC<L, R, S>): Client<L, R, S> {
   // FIXME This `any` cast looks like a hack
   return new Proxy(rpc as any, {
     get(target, p, receiver) {

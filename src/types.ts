@@ -171,7 +171,7 @@ class ImplBuilder<L extends Contract, R extends Contract> {
 
   }
 
-  public state<S2 extends object>(): ImplBuilder2<L, R, never, S2> {
+  public state<S2>(): ImplBuilder2<L, R, never, S2> {
     return new ImplBuilder2(this.local, this.remote, {});
   }
 
@@ -201,7 +201,7 @@ class ImplBuilder<L extends Contract, R extends Contract> {
 
 }
 
-class ImplBuilder2<L extends Contract, R extends Contract, Names extends keyof L['methods'], S extends object> {
+class ImplBuilder2<L extends Contract, R extends Contract, Names extends keyof L['methods'], S> {
 
   public constructor(
     public local: L,

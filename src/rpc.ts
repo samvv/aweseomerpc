@@ -515,5 +515,5 @@ export function connect<
   R extends Contract,
   S extends object
 >(impl: Impl<L, R, S>, transport: Transport, state: S, logger?: Logger) {
-  return createProxy(new RPC(transport, impl, state, logger));
+  return createProxy<L, R, S>(new RPC(transport, impl, state, logger));
 }

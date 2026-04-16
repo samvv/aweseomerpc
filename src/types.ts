@@ -1,7 +1,8 @@
-import { validate, type Type, type Infer, type CallableType, type UndefinedType } from "reflect-types";
+import { validate, type Type, type Infer, type CallableType } from "reflect-types";
 
 import { FailedValidationError, ParamCountMismatchError } from "./error.js";
 import type { Subject } from "rxjs";
+import type { RPC } from "./rpc.js";
 
 function assign<O extends Record<any, any>, K extends PropertyKey, V>(obj: O, key: K, value: V): O & Record<K, V> {
   return Object.assign(obj, makeObj(key, value));
@@ -16,21 +17,13 @@ export type InferTuple<Ps extends ReadonlyArray<Type>> = { [I in keyof Ps]: Infe
 type Promisify<T extends CallableType>
   = (...args: T['paramTypes']) => Promise<Awaited<T['returnType']>>;
 
-type OptionalEvents<T extends Record<string, EventContract>> = { [K in keyof T as T[K]['ty'] extends UndefinedType ? K : never]: T[K] }
-type RequiredEvents<T extends Record<string, EventContract>> = { [K in keyof T as T[K]['ty'] extends UndefinedType ? never : K]: T[K] }
-
-export type ClientObj<L extends Contract, R extends Contract>
+export type ClientObj<L extends Contract, R extends Contract, S>
   = { [K in keyof R['methods']]: Promisify<R['methods'][K]>; }
   & { [K in keyof L['events']]: Subject<L['events'][K]['ty']>; }
-  & ClientObjStatic<L, R>
-
-interface ClientObjStatic<L extends Contract, R extends Contract> {
-  notify<K extends keyof OptionalEvents<R['events']>>(name: K): void;
-  notify<K extends keyof RequiredEvents<R['events']>>(name: K, arg: Infer<R['events'][K]['ty']>): void;
-}
+  & RPC<L, R, S>;
 
 type Request<L extends Contract, R extends Contract, S, K extends keyof L['methods']> = {
-  client: ClientObj<L, R>;
+  client: ClientObj<L, R, S>;
   state: S;
 };
 
@@ -237,7 +230,7 @@ class ImplBuilder2<L extends Contract, R extends Contract, Names extends keyof L
 export class Impl<
   L extends Contract,
   R extends Contract,
-  S extends object = {}
+  S = {}
 > {
 
   public state!: S;

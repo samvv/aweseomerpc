@@ -1,5 +1,5 @@
 import { BehaviorSubject, Subject, Subscription } from "rxjs";
-import { type Infer } from "reflect-types";
+import { type Infer, type UndefinedType } from "reflect-types";
 
 import { isPlainObject, Deferred, type JSONObject, type JSONValue, isPrimitive, isPromise } from "./util.js";
 import {
@@ -36,7 +36,7 @@ import {
 } from "./protocol.js";
 import type { Transport } from "./transport.js";
 import { EventNotFoundError, MethodNotFoundError, ProtocolError, RemoteError, RPCError, FailedValidationError } from "./error.js";
-import type { Contract, Impl, InferTuple } from "./types.js";
+import type { Contract, EventContract, Impl, InferTuple, OptionalEvents, RequiredEvents } from "./types.js";
 import { createProxy } from "./proxy.js";
 import type { Logger } from "./logger.js"
 
@@ -65,7 +65,10 @@ export type AnyMethods = Record<string, MethodFn>;
 
 export type RPCValue = JSONValue | AsyncIterable<any, any, any> | Resource<Subject<any>> | Resource<BehaviorSubject<any>>;
 
-export class RPC<L extends Contract, R extends Contract, S extends object> {
+type OptionalEvents<T extends Record<string, EventContract>> = { [K in keyof T as T[K]['ty'] extends UndefinedType ? K : never]: T[K] }
+type RequiredEvents<T extends Record<string, EventContract>> = { [K in keyof T as T[K]['ty'] extends UndefinedType ? never : K]: T[K] }
+
+export class RPC<L extends Contract, R extends Contract, S> {
 
   // For sending data
   private nextMessageId = 0;
@@ -106,9 +109,11 @@ export class RPC<L extends Contract, R extends Contract, S extends object> {
     return this.events[name];
   }
 
+  public notify<K extends keyof OptionalEvents<R['events']>>(name: K): void;
+  public notify<K extends keyof RequiredEvents<R['events']>>(name: K, arg: Infer<R['events'][K]['ty']>): void;
 
-  public async notify<K extends keyof R['events']>(eventName: K, value: Infer<R['events'][K]['ty']>): Promise<void> {
-    await this.transport.output.write(JSON.stringify([ MSGID_EVENT, eventName, this.encode(value) ]));
+  public async notify<K extends keyof R['events']>(eventName: K, value?: Infer<R['events'][K]['ty']>): Promise<void> {
+    this.transport.output.write(JSON.stringify([ MSGID_EVENT, eventName, this.encode(value) ]));
   }
 
   public hasMethod(name: string) {

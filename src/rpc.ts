@@ -513,7 +513,7 @@ export class RPC<L extends Contract, R extends Contract, S> {
 export function connect<
   L extends Contract,
   R extends Contract,
-  S extends object
+  S
 >(impl: Impl<L, R, S>, transport: Transport, state: S, logger?: Logger) {
   return createProxy<L, R, S>(new RPC(transport, impl, state, logger));
 }

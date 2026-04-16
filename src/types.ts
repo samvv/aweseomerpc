@@ -19,7 +19,7 @@ type Promisify<T extends CallableType>
 
 export type Client<L extends Contract, R extends Contract, S>
   = { [K in keyof R['methods']]: Promisify<R['methods'][K]>; }
-  & { [K in keyof L['events']]: Subject<L['events'][K]['ty']>; }
+  & { [K in keyof L['events']]: Subject<Infer<L['events'][K]['ty']>>; }
   & RPC<L, R, S>;
 
 type Request<L extends Contract, R extends Contract, S, K extends keyof L['methods']> = {

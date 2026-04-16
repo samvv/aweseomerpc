@@ -1,6 +1,6 @@
 {
   "name": "awesomerpc",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "A fully typed RPC framework for TypeScript",
   "keywords": [
     "rpc",

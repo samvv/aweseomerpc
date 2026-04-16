@@ -15,7 +15,7 @@ function makeObj<K extends PropertyKey, V>(key: K, value: V): Record<K, V> {
 export type InferTuple<Ps extends ReadonlyArray<Type>> = { [I in keyof Ps]: Infer<Ps[I]> }
 
 type Promisify<T extends CallableType>
-  = (...args: T['paramTypes']) => Promise<Awaited<T['returnType']>>;
+  = (...args: Parameters<Infer<T>>) => Promise<Awaited<ReturnType<Infer<T>>>>;
 
 export type ClientObj<L extends Contract, R extends Contract, S>
   = { [K in keyof R['methods']]: Promisify<R['methods'][K]>; }

@@ -50,8 +50,8 @@ export interface Contract {
 }
 
 export type LitContractIn<
-  M extends Record<string, MethodContract> = Record<string, MethodContract>,
-  E extends Record<string, Type> = Record<string, Type>
+  M extends Record<string, MethodContract> = {},
+  E extends Record<string, Type> = {}
 > = {
   methods?: M,
   events?: E,
@@ -144,7 +144,7 @@ export function emptyContract(): LitContract<{}, {}> {
   return new LitContract({}, {});
 }
 
-export function contract<M extends Record<string, MethodContractIn>, E extends Record<string, EventContractIn>>(spec: LitContractIn<M, E>) {
+export function contract<M extends Record<string, MethodContractIn> = {}, E extends Record<string, EventContractIn> = {}>(spec: LitContractIn<M, E>) {
   const events = {} as any;
   for (const [k, v] of Object.entries(spec.events ?? {})) {
     events[k] = { ty: v };

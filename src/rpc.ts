@@ -36,7 +36,7 @@ import {
 } from "./protocol.js";
 import type { Transport } from "./transport.js";
 import { EventNotFoundError, MethodNotFoundError, ProtocolError, RemoteError, RPCError, FailedValidationError } from "./error.js";
-import type { Contract, EventContract, Impl, InferTuple, OptionalEvents, RequiredEvents } from "./types.js";
+import type { Contract, EventContract, Impl, InferTuple } from "./types.js";
 import { createProxy } from "./proxy.js";
 import type { Logger } from "./logger.js"
 

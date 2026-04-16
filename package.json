@@ -1,6 +1,6 @@
 {
   "name": "awesomerpc",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "A fully typed RPC framework for TypeScript",
   "keywords": [
     "rpc",
@@ -33,6 +33,6 @@
     "@types/bun": "^1.3.12"
   },
   "optionalDependencies": {
-    "hono": "^4.12.12"
+    "hono": "^4.12.14"
   }
 }

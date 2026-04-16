@@ -60,15 +60,19 @@ export class WebSocketTransport implements Transport {
     this.errors.next(new GenericWebSocketError());
   }
 
-  public static open(url: string, { timeout = DEFAULT_WEBSOCKET_TIMEOUT } = {}): Promise<void> {
+  public static open(url: string, { timeout = DEFAULT_WEBSOCKET_TIMEOUT } = {}): Promise<WebSocketTransport> {
     return new Promise((accept, reject) => {
       const ws = new WebSocket(url);
       let didOpen = false;
       const interval = setTimeout(() => {
+        ws.removeEventListener('open', onOpen);
+        ws.removeEventListener('error', onError);
         ws.close();
         reject(new TimeoutReachedWebSocketError());
       }, timeout);
       const onError = () => {
+        ws.removeEventListener('open', onOpen);
+        ws.removeEventListener('error', onError);
         clearTimeout(interval);
         reject(didOpen ? new GenericWebSocketError() : new GenericOpenWebSocketError());
       }
@@ -77,7 +81,7 @@ export class WebSocketTransport implements Transport {
         ws.removeEventListener('error', onError);
         didOpen = true;
         clearTimeout(interval);
-        accept();
+        accept(new WebSocketTransport(ws));
       }
       ws.addEventListener('error', onError);
       ws.addEventListener('open', onOpen);

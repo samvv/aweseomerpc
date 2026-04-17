@@ -115,8 +115,11 @@ async function loadTransport(url: string) {
 await run(cli, process.argv.slice(2));
 
 async function print(value: any): Promise<void> {
+  if (value === undefined) {
+    return;
+  }
   if (isPrimitive(value)) {
-    console.log(value)
+    console.log(value);
   } else if (value[Symbol.asyncIterator] !== undefined) {
     const iter = value[Symbol.asyncIterator]();
     for (;;) {

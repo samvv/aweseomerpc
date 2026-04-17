@@ -46,7 +46,12 @@ export class WebSocketTransport implements Transport {
   public constructor(public ws: WebSocket) {
     this.output = new stream.Writable({
       write(chunk, encoding, callback) {
-        ws.send(chunk.toString(encoding));
+        ws.send(chunk.toString(
+          // @ts-ignore Bug in @types/node
+          // See https://github.com/DefinitelyTyped/DefinitelyTyped/discussions/74892
+          encoding !== 'buffer'
+            ? encoding
+            : undefined));
         callback();
       },
     });

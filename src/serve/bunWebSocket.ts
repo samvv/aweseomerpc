@@ -21,10 +21,13 @@ class ServerWebSocketTransport implements Transport {
     });
     this.output = new stream.Writable({
       write(chunk, encoding, callback) {
-        if (chunk instanceof Buffer) {
-          chunk = chunk.toString(encoding);
-        }
-        ws.send(chunk);
+        ws.send(chunk.toString(
+          // @ts-ignore Bug in @types/node
+          // See https://github.com/DefinitelyTyped/DefinitelyTyped/discussions/74892
+          encoding !== 'buffer'
+            ? encoding
+            : undefined
+        ));
         callback();
       },
     });

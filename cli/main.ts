@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { command, option, optional, positional, rest, run, string, subcommands } from "cmd-ts"
-import { anyContract, emptyContract, implement, connect, WebSocketTransport, TransportError } from "awesomerpc";
+import { anyContract, emptyContract, implement, connect, WebSocketTransport, TransportError, RPC } from "awesomerpc";
 import pino from "pino";
 
 const logger = pino({
@@ -36,10 +36,9 @@ const cli = subcommands({
         // Initialize RPC
         console.info(`> Sending request to ${url} ...`);
         const transport = await loadTransport(url);
-        await transport.open();
         const local = emptyContract(); // Remote is not allowed to call any methods
         const remote = anyContract(); // We are allowed to dynamically call anthing we wish
-        const rpc = connect(implement(local, remote).finish(), transport, {}, logger);
+        const rpc = new RPC(transport, implement(local, remote).finish(), {}, logger);
 
         const result = await rpc.callMethod(methodName, methodArgs)
         await print(result);
@@ -74,10 +73,9 @@ const cli = subcommands({
 
         // Initialize RPC
         const transport = await loadTransport(url);
-        await transport.open();
         const local = emptyContract(); // Remote is not allowed to call any methods
         const remote = anyContract(); // We are allowed to dynamically call anthing we wish
-        const rpc = connect(implement(local, remote).finish(), transport, {});
+        const rpc = new RPC(transport, implement(local, remote).finish(), {}, logger);
 
         await rpc.notify(eventName, arg);
 
@@ -108,7 +106,7 @@ async function loadTransport(url: string) {
   const protocol = new URL(url).protocol;
   switch (protocol) {
     case 'ws:':
-      return new WebSocketTransport(url);
+      return WebSocketTransport.open(url);
     default:
       throw new Error(`Unrecognised protocol '${protocol}'`);
   }

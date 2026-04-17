@@ -1,8 +1,8 @@
 import * as stream from "node:stream"
 import type { ServerWebSocket } from "bun";
 
-import { RPC } from "../rpc.js"
-import type { Contract, Impl } from "../types.js";
+import { connect } from "../rpc.js"
+import type { Client, Contract, Impl } from "../types.js";
 import type { Logger } from "../logger.js";
 import type { Transport } from "../transport.js";
 
@@ -47,6 +47,8 @@ export type ServeOptions<
 > = {
   impl: Impl<L, R, S>;
   createState: (ws: ServerWebSocket<unknown>) => S;
+  open?: (client: Client<L, R, S>) => void | Promise<void>;
+  close?: (client: Client<L, R, S>) => void | Promise<void>;
   port?: number;
   logger?: Logger;
   hostname?: string;
@@ -57,11 +59,11 @@ type WebSocketData<
   R extends Contract,
   S extends object
 > = {
-  rpc: RPC<L, R, S>;
+  client: Client<L, R, S>;
   transport: ServerWebSocketTransport;
 }
 
-export default function honoServe<
+export default function bunServe<
   L extends Contract,
   R extends Contract,
   S extends object
@@ -71,6 +73,8 @@ export default function honoServe<
   hostname = 'localhost',
   port = 8080,
   createState,
+  open,
+  close,
 }: ServeOptions<L, R, S>) {
 
   return Bun.serve<WebSocketData<L, R, S> | null>({
@@ -83,22 +87,28 @@ export default function honoServe<
       return new Response("Upgrade failed", { status: 500 });
     },
     websocket: {
-      open(ws) {
+      async open(ws) {
         const state = createState(ws);
         const transport = new ServerWebSocketTransport(ws);
-        const rpc = new RPC(
-          transport,
+        const client = connect(
           impl,
+          transport,
           state,
           logger,
         );
-        ws.data = { rpc, transport };
+        if (open !== undefined) {
+          await open(client);
+        }
+        ws.data = { client, transport };
       },
       message(ws, message) {
         ws.data!.transport.feed(message.toString());
       },
-      close(ws, _code, _message) {
-        ws.data!.rpc.close();
+      async close(ws, _code, _message) {
+        if (close !== undefined) {
+          await close(ws.data!.client);
+        }
+        ws.data!.client.close();
         ws.data!.transport.close();
       },
     }

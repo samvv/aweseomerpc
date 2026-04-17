@@ -28,6 +28,7 @@ import {
   TYPE_ARRAY,
   TYPE_ASYNC_GENERATOR,
   TYPE_BEHAVIORSUBJECT,
+  TYPE_DATE,
   TYPE_OBJECT,
   TYPE_PRIMITIVE,
   TYPE_PROMISE,
@@ -137,6 +138,9 @@ export class RPC<L extends Contract, R extends Contract, S> {
     if (isPrimitive(value)) {
       return [ TYPE_PRIMITIVE, value ];
     }
+    if (value instanceof Date) {
+      return [ TYPE_DATE, value.toISOString() ];
+    }
     if (isPromise(value)) {
       const id = this.nextPromiseId++;
       value
@@ -218,6 +222,14 @@ export class RPC<L extends Contract, R extends Contract, S> {
         return undefined;
       case TYPE_PRIMITIVE:
         return value[1];
+      case TYPE_DATE:
+        {
+          const format = value[1];
+          if (typeof(format) !== 'string') {
+            throw new ProtocolError(`Could not decode value: date specifier is not a string`);
+          }
+          return new Date(format);
+        }
       case TYPE_ARRAY:
         {
           if (!Array.isArray(value[1])) {

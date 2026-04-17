@@ -9,6 +9,7 @@ export const TYPE_UNDEFINED       = 4;
 export const TYPE_SUBJECT         = 5;
 export const TYPE_BEHAVIORSUBJECT = 6;
 export const TYPE_PROMISE         = 7;
+export const TYPE_DATE            = 8;
 
 export const MSGID_REQUEST             = 0;
 export const MSGID_RESPOND_OK          = 1;
